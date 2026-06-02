@@ -1,0 +1,6 @@
+{
+  "name": "FlexBlox",
+  "description": "Локальный конструктор игр в стиле Roblox с трехмерным редактором, физикой и мультиплеером по Wi-Fi",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
