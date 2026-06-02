@@ -46,12 +46,12 @@ const FACES = [
 ];
 
 const HATS = [
-  { id: 'none', label: 'No Hat', value: '' },
-  { id: 'cap', label: 'Red Cap', value: '#ef4444' },
-  { id: 'fedora', label: 'Classic Black Fedora', value: '#1e293b' },
-  { id: 'crown', label: 'Golden Crown', value: '#eab308' },
-  { id: 'valk', label: 'Valkyrie Helm', value: '#e2e8f0' },
-  { id: 'tophat', label: 'Ringmaster Tophat', value: '#475569' },
+  { id: 'none', label: 'Без шляпы ❌', value: '' },
+  { id: 'cap', label: 'Red Cap 🧢', value: '#ef4444' },
+  { id: 'tophat', label: 'Classic Tophat 🎩', value: '#475569' },
+  { id: 'fedora', label: 'Black Fedora 💼', value: '#1e293b', priceCoins: 150 },
+  { id: 'crown', label: 'Golden Crown 👑', value: '#eab308', priceCoins: 300 },
+  { id: 'valk', label: 'Valkyrie Helm 🪽', value: '#e2e8f0', priceCoins: 500 },
 ];
 
 export default function StartMenu({
@@ -78,8 +78,10 @@ export default function StartMenu({
 }: StartMenuProps) {
   const [activeSubTab, setActiveSubTab] = useState<'discover' | 'avatar' | 'studio' | 'settings'>('discover');
   const [robux, setRobux] = useState<number>(350);
+  const [coins, setCoins] = useState<number>(100);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isRobuxGlow, setIsRobuxGlow] = useState<boolean>(false);
+  const [isCoinsGlow, setIsCoinsGlow] = useState<boolean>(false);
   
   // Custom navigation sidebar toggle
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
@@ -95,6 +97,9 @@ export default function StartMenu({
   // VIP Server inputs
   const [vipServerName, setVipServerName] = useState<string>('');
   const [customVipServers, setCustomVipServers] = useState<{ name: string; code: string }[]>([]);
+
+  // Track owned accessories
+  const [ownedHats, setOwnedHats] = useState<Set<string>>(new Set(['none', 'cap', 'tophat']));
 
   // Simulated active in-client lobbies
   const [simulatedServers, setSimulatedServers] = useState([
@@ -117,6 +122,25 @@ export default function StartMenu({
       localStorage.setItem('fb_user_robux', '350');
     }
 
+    const storedCoins = localStorage.getItem('fb_user_coins');
+    if (storedCoins) {
+      setCoins(Number(storedCoins));
+    } else {
+      localStorage.setItem('fb_user_coins', '100');
+      setCoins(100);
+    }
+
+    const savedHats = localStorage.getItem('fb_owned_hats');
+    if (savedHats) {
+      try {
+        setOwnedHats(new Set(JSON.parse(savedHats)));
+      } catch (e) {
+        setOwnedHats(new Set(['none', 'cap', 'tophat']));
+      }
+    } else {
+      localStorage.setItem('fb_owned_hats', JSON.stringify(['none', 'cap', 'tophat']));
+    }
+
     const rawServers = localStorage.getItem('fb_vip_servers');
     if (rawServers) {
       setCustomVipServers(JSON.parse(rawServers));
@@ -134,25 +158,73 @@ export default function StartMenu({
     }, 850);
   };
 
-  // Buy Coil Action
-  const buyGamepass = (type: 'speed' | 'gravity', price: number) => {
-    if (robux >= price) {
-      const nextR = robux - price;
-      setRobux(nextR);
-      localStorage.setItem('fb_user_robux', String(nextR));
-      
-      if (type === 'speed') {
-        localStorage.setItem('fb_has_speed_coil', 'true');
-        setHasSpeedCoil(true);
+  // Buy Coil Action (Dual Currency!)
+  const buyGamepass = (type: 'speed' | 'gravity', price: number, currency: 'robux' | 'coins') => {
+    if (currency === 'robux') {
+      if (robux >= price) {
+        const nextR = robux - price;
+        setRobux(nextR);
+        localStorage.setItem('fb_user_robux', String(nextR));
+        
+        if (type === 'speed') {
+          localStorage.setItem('fb_has_speed_coil', 'true');
+          setHasSpeedCoil(true);
+        } else {
+          localStorage.setItem('fb_has_gravity_coil', 'true');
+          setHasGravityCoil(true);
+        }
+        setIsRobuxGlow(true);
+        setTimeout(() => setIsRobuxGlow(false), 500);
+        alert(`🎉 Успешно куплено за Robux! Катушка ${type === 'speed' ? 'Скорости (Speed Coil)' : 'Гравитации (Gravity Coil)'} активирована во всех играх!`);
       } else {
-        localStorage.setItem('fb_has_gravity_coil', 'true');
-        setHasGravityCoil(true);
+        alert('❌ Недостаточно Robux! Нажмите на кнопку "+FREE" в углу экрана, чтобы получить бесплатную валюту!');
       }
-      setIsRobuxGlow(true);
-      setTimeout(() => setIsRobuxGlow(false), 500);
-      alert(`🎉 Успешно куплено! Катушка ${type === 'speed' ? 'Скорости (Speed Coil)' : 'Гравитации (Gravity Coil)'} активирована во всех плейсах!`);
     } else {
-      alert('❌ Недостаточно Robux! Нажмите на кнопку "+FREE" в углу экрана, чтобы получить бесплатную валюту!');
+      if (coins >= price) {
+        const nextC = coins - price;
+        setCoins(nextC);
+        localStorage.setItem('fb_user_coins', String(nextC));
+        
+        if (type === 'speed') {
+          localStorage.setItem('fb_has_speed_coil', 'true');
+          setHasSpeedCoil(true);
+        } else {
+          localStorage.setItem('fb_has_gravity_coil', 'true');
+          setHasGravityCoil(true);
+        }
+        setIsCoinsGlow(true);
+        setTimeout(() => setIsCoinsGlow(false), 500);
+        alert(`🎉 Успешно куплено за монеты! Катушка ${type === 'speed' ? 'Скорости' : 'Гравитации'} активирована во всех играх!`);
+      } else {
+        alert(`❌ Недостаточно Блок-Монет! Требуется ${price} 🪙 (у вас ${coins} 🪙). Играйте в игры (Obby / Speed Simulator) и собирайте золотые монеты!`);
+      }
+    }
+  };
+
+  // Select or buy a premium hat with Block Coins
+  const handleSelectHat = (hat: typeof HATS[number]) => {
+    if (!hat.priceCoins || ownedHats.has(hat.id)) {
+      setAvatarHat(hat.value);
+    } else {
+      if (confirm(`Купить премиум-аксессуар "${hat.label}" за ${hat.priceCoins} 🪙?`)) {
+        if (coins >= hat.priceCoins) {
+          const nextCoins = coins - hat.priceCoins;
+          setCoins(nextCoins);
+          localStorage.setItem('fb_user_coins', String(nextCoins));
+          
+          const nextOwned = new Set(ownedHats);
+          nextOwned.add(hat.id);
+          setOwnedHats(nextOwned);
+          localStorage.setItem('fb_owned_hats', JSON.stringify(Array.from(nextOwned)));
+          
+          setAvatarHat(hat.value);
+          setIsCoinsGlow(true);
+          setTimeout(() => setIsCoinsGlow(false), 500);
+          alert(`🎉 Поздравляем! Аксессуар "${hat.label}" разблокирован и одет!`);
+        } else {
+          alert(`❌ Недостаточно Блок-Монет! У вас ${coins} 🪙, а требуется ${hat.priceCoins} 🪙. Играйте в плейсы, собирайте монеты и возвращайтесь!`);
+        }
+      }
     }
   };
 
@@ -186,7 +258,7 @@ export default function StartMenu({
   // Simulated friends inside FlexBlox portal
   const simulatedFriends = [
     { nickname: 'BuilderMan_99', face: '👷', color: '#eab308', status: 'In Studio' },
-    { nickname: 'FlexBloxian_PRO', face: '😎', color: '#3b82f6', status: 'Playing Sim' },
+    { nickname: 'Flexian_PRO', face: '😎', color: '#3b82f6', status: 'Playing Sim' },
     { nickname: 'SpeedRunner_X', face: '🤪', color: '#10b981', status: 'Playing Obby' },
     { nickname: 'NoobGamer_2009', face: '🙂', color: '#ef4444', status: 'Offline' }
   ];
@@ -215,8 +287,8 @@ export default function StartMenu({
             >
               <div className="w-2.5 h-2.5 bg-[#1e2024] transform rotate-12 transition-colors group-hover:bg-[#111]" />
             </button>
-            <span className="text-sm font-black tracking-wider text-white hidden sm:block">
-              FLEXBLOX <span className="text-[#0084ff] font-bold text-xs uppercase tracking-normal">Platform v2</span>
+            <span className="text-sm font-black tracking-wider text-white hidden sm:block uppercase">
+              FLEXBLOX <span className="text-red-500 font-bold text-xs uppercase tracking-normal">Platform v2.0</span>
             </span>
           </div>
         </div>
@@ -241,6 +313,33 @@ export default function StartMenu({
               <span className="font-mono text-xs font-black text-white">{robux}</span>
               <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/20">+FREE</span>
             </button>
+          </div>
+
+          {/* Block Coins indicator with FREE claim button */}
+          <div className="flex items-center gap-1.5 font-sans">
+            <div
+              className={`flex items-center gap-1.5 bg-[#141518] border border-slate-700/60 p-1 py-0.5 sm:px-3 sm:py-1 rounded transition duration-150 ${
+                isCoinsGlow ? 'scale-110 border-yellow-500' : ''
+              }`}
+              title="Ваши Блок-Монеты (зарабатывайте в играх!)"
+            >
+              <span className="text-yellow-400 font-extrabold text-base leading-none">🪙</span>
+              <span className="font-mono text-xs font-black text-white">{coins}</span>
+              <button
+                onClick={() => {
+                  const nextC = coins + 250;
+                  setCoins(nextC);
+                  localStorage.setItem('fb_user_coins', String(nextC));
+                  setIsCoinsGlow(true);
+                  setTimeout(() => setIsCoinsGlow(false), 500);
+                  alert("🎉 Вы получили +250 приветственных Блок-Монет!");
+                }}
+                className="text-[9.5px] font-bold text-yellow-400 hover:text-yellow-300 bg-yellow-500/10 hover:bg-yellow-500/25 px-1 rounded border border-yellow-500/20 hover:border-yellow-400/40 cursor-pointer ml-1.5 transition leading-snug"
+                title="Получить бесплатные монеты!"
+              >
+                +FREE
+              </button>
+            </div>
           </div>
 
           <div className="h-6 w-px bg-slate-700/60" />
@@ -320,19 +419,18 @@ export default function StartMenu({
 
             <div className="h-px bg-[#2d3034] my-2" />
 
-            {/* Quick action claiming store */}
-            <div className="p-3 bg-indigo-505/10 bg-gradient-to-b from-indigo-950/20 to-transparent border border-indigo-500/20 rounded-lg space-y-2 mt-3 text-center">
-              <span className="text-[10px] text-indigo-400 font-extrabold uppercase block tracking-wider">UPGRADE PREMIUM</span>
-              <p className="text-[10px] text-gray-400 leading-relaxed max-w-[150px] mx-auto">
-                Get free 150 Robux instantly with our multi-platform hack algorithm!
-              </p>
-              <button
-                onClick={claimFreeRobux}
-                className="w-full py-1 bg-[#eab308] hover:bg-yellow-450 duration-150 text-slate-900 font-black rounded text-[10px]"
-              >
-                CLAIM $R FREE
-              </button>
-            </div>
+                  <div className="space-y-1 p-3 bg-indigo-505/10 bg-gradient-to-b from-slate-900/40 to-transparent border border-[#393b3d] rounded-lg mt-3 text-center">
+                    <span className="text-[10px] text-cyan-400 font-extrabold uppercase block tracking-wider font-sans">UPGRADE PREMIUM</span>
+                    <p className="text-[10px] text-gray-400 leading-relaxed max-w-[150px] mx-auto">
+                      Get free 150 Robux instantly with our multi-platform hack algorithm!
+                    </p>
+                    <button
+                      onClick={claimFreeRobux}
+                      className="w-full py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded text-[10px] cursor-pointer"
+                    >
+                      CLAIM $R FREE
+                    </button>
+                  </div>
           </div>
 
           {/* Footers credit indicator */}
@@ -347,8 +445,8 @@ export default function StartMenu({
           {/* SEARCH & WELCOME SUMMARY SPLIT HEADER */}
           <div className="bg-[#1e2024] rounded-xl p-5 mb-6 border border-[#2d3034] flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="space-y-1">
-              <h2 className="text-xl font-black text-white leading-tight">
-                Welcome to FlexBlox, <span className="text-[#0084ff]">{username}</span>!
+              <h2 className="text-xl font-black text-white leading-tight font-sans">
+                Welcome to FLEXBLOX, <span className="text-[#0084ff]">{username}</span>!
               </h2>
               <p className="text-xs text-slate-400 font-medium">Explore places, configure custom gamepasses, and construct block worlds!</p>
             </div>
@@ -596,21 +694,37 @@ export default function StartMenu({
 
                   {/* Hats Catalog */}
                   <div className="space-y-2">
-                    <span className="text-[10px] font-bold text-[#84868a] uppercase tracking-wider block">Head accessories (Hats)</span>
+                    <span className="text-[10px] font-bold text-[#84868a] uppercase tracking-wider block font-sans">Head accessories (Hats)</span>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {HATS.map((hat) => (
-                        <button
-                          key={hat.id}
-                          onClick={() => setAvatarHat(hat.value)}
-                          className={`px-3 py-2.5 rounded border text-xs font-bold text-left transition ${
-                            avatarHat === hat.value
-                              ? 'bg-[#0084ff]/10 text-[#0084ff] border-[#0084ff]'
-                              : 'bg-[#141518] text-gray-300 border-[#2d2f32] hover:bg-[#1e2023]'
-                          }`}
-                        >
-                          {hat.label}
-                        </button>
-                      ))}
+                      {HATS.map((hat) => {
+                        const isSelected = avatarHat === hat.value;
+                        const hasPrice = !!hat.priceCoins;
+                        const isOwned = !hasPrice || ownedHats.has(hat.id);
+                        return (
+                          <button
+                            key={hat.id}
+                            onClick={() => handleSelectHat(hat)}
+                            className={`px-3 py-2 border rounded text-xs font-bold transition flex flex-col justify-between text-left gap-1 cursor-pointer min-h-[58px] ${
+                              isSelected
+                                ? 'bg-[#0084ff]/10 text-[#0084ff] border-[#0084ff]'
+                                : 'bg-[#141518] text-gray-350 border-[#2d2f32] hover:bg-[#1e2023]'
+                            }`}
+                          >
+                            <span className="truncate w-full">{hat.label}</span>
+                            <div className="flex items-center justify-between w-full text-[9px] font-mono leading-none">
+                              {isSelected ? (
+                                <span className="text-[#0084ff]">Equipped ✔️</span>
+                              ) : isOwned ? (
+                                <span className="text-emerald-400 font-bold uppercase">Owned</span>
+                              ) : (
+                                <span className="text-yellow-400 font-extrabold flex items-center gap-0.5">
+                                  🪙 {hat.priceCoins}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -842,7 +956,7 @@ export default function StartMenu({
                     <h4 className="font-bold text-white">Grid Snapper Precision stud (m)</h4>
                     <p className="text-xs text-[#84868a]">Default spatial steps inside FlexStudio workspace editor.</p>
                   </div>
-                  <span className="text-xs font-mono font-bold text-slate-300">1.0 studs (Roblox standard Grid)</span>
+                  <span className="text-xs font-mono font-bold text-slate-300">1.0 studs (FlexBlox standard Grid)</span>
                 </div>
 
                 <div className="space-y-3">
@@ -861,7 +975,7 @@ export default function StartMenu({
                       <span className="font-bold text-[#0084ff]">PHONES / TABLETS</span>
                       <p className="text-[#84868a] leading-relaxed">
                         LEFT analog wheel — Glide to move.<br />
-                        RIGHT transparent JUMP — Roblox jumping force.<br />
+                        RIGHT transparent JUMP — FlexBlox jumping force.<br />
                         TOUCH SCREEN SWIPE — Smooth pitch & yaw angle orbit.
                       </p>
                     </div>
@@ -876,7 +990,7 @@ export default function StartMenu({
 
       </div>
 
-      {/* 3. CORE ROBLOX-STYLE GAME DETAILS POP-UP MODAL OVERLAY */}
+      {/* 3. CORE FLEXBLOX-STYLE GAME DETAILS POP-UP MODAL OVERLAY */}
       {selectedPlaceDetails && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 animate-fade-in pointer-events-auto">
           <div className="bg-[#1e2024] w-full max-w-4xl max-h-[92vh] rounded-xl border border-slate-700/50 shadow-2xl flex flex-col overflow-hidden relative text-slate-200">
@@ -895,7 +1009,7 @@ export default function StartMenu({
               <div className="absolute inset-0 bg-black/40 opacity-70 z-0" />
               
               <div className="relative z-10 max-w-xl text-left">
-                <span className="text-[10px] bg-emerald-600 text-white font-black px-2 py-0.5 rounded tracking-wider uppercase">FLEX DETAILED EXPERIENCE</span>
+                <span className="text-[10px] bg-red-650 text-white font-black px-2 py-0.5 rounded tracking-wider uppercase">FLEXBLOX DETAILED EXPERIENCE</span>
                 <h1 className="text-2xl sm:text-3xl font-black text-white mt-1 uppercase tracking-tight drop-shadow-md">
                   {selectedPlaceDetails.name} <span className="text-[#00e676] text-lg">✔️</span>
                 </h1>
@@ -1014,65 +1128,83 @@ export default function StartMenu({
                 <div className="space-y-6">
                   <div>
                     <h4 className="font-extrabold text-white text-base">FlexBlox Gamepass Store</h4>
-                    <p className="text-xs text-slate-400">Unlock outstanding permanent abilities using your Robux balance!</p>
+                    <p className="text-xs text-slate-400">Unlock outstanding permanent abilities using your Robux balance or earned Блок-Монеты!</p>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4">
                     
                     {/* Gamepass Item 1: SPEED COIL */}
-                    <div className="bg-[#141518] rounded-xl p-4 border border-slate-700/30 flex items-center justify-between gap-5 transition duration-150 hover:border-red-500/20">
+                    <div className="bg-[#141518] rounded-xl p-4 border border-slate-700/30 flex flex-col sm:flex-row sm:items-center justify-between gap-5 transition duration-150 hover:border-red-500/20">
                       <div className="flex items-center gap-4 align-middle">
-                        <div className="w-14 h-14 bg-red-600/10 rounded-xl border border-red-500/30 flex items-center justify-center text-3xl shadow">
+                        <div className="w-14 h-14 bg-red-600/10 rounded-xl border border-red-500/30 flex items-center justify-center text-3xl shadow shrink-0">
                           ⚡
                         </div>
-                        <div className="space-y-0.5 max-w-[200px]">
+                        <div className="space-y-0.5">
                           <h5 className="font-black text-rose-450 text-sm">Speed Coil (Катушка Скорости)</h5>
                           <p className="text-[11px] text-[#84868a] leading-tight">Increases horizontal walk tempo by 1.6x permanently!</p>
                         </div>
                       </div>
 
-                      <div className="shrink-0 text-right">
+                      <div className="shrink-0 flex sm:flex-col gap-2 justify-end">
                         {hasSpeedCoil ? (
                           <span className="p-1 px-3 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold text-[11px] uppercase tracking-wide">Owned ✔️</span>
                         ) : (
-                          <button
-                            onClick={() => buyGamepass('speed', 50)}
-                            className="px-4 py-2 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow transition"
-                          >
-                            <svg className="w-3.5 h-3.5 text-slate-950 fill-slate-950" viewBox="0 0 32 32">
-                              <path d="M16 2 L29 11 L24 28 L8 28 L3 11 Z" stroke="currentColor" strokeWidth="2.5" />
-                            </svg>
-                            50 R$
-                          </button>
+                          <>
+                            <button
+                              onClick={() => buyGamepass('speed', 50, 'robux')}
+                              className="px-3 py-2 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1 shadow transition cursor-pointer"
+                            >
+                              <svg className="w-3 h-3 text-slate-950 fill-slate-950" viewBox="0 0 32 32">
+                                <path d="M16 2 L29 11 L24 28 L8 28 L3 11 Z" stroke="currentColor" strokeWidth="2.5" />
+                              </svg>
+                              50 R$
+                            </button>
+                            <button
+                              onClick={() => buyGamepass('speed', 250, 'coins')}
+                              className="px-3 py-2 rounded bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-black text-xs flex items-center gap-1 shadow transition cursor-pointer"
+                            >
+                              <span>🪙</span>
+                              250 Coins
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>
 
                     {/* Gamepass Item 2: GRAVITY COIL */}
-                    <div className="bg-[#141518] rounded-xl p-4 border border-slate-700/30 flex items-center justify-between gap-5 transition duration-150 hover:border-blue-500/20">
+                    <div className="bg-[#141518] rounded-xl p-4 border border-slate-700/30 flex flex-col sm:flex-row sm:items-center justify-between gap-5 transition duration-150 hover:border-blue-500/20">
                       <div className="flex items-center gap-4 align-middle">
-                        <div className="w-14 h-14 bg-blue-600/10 rounded-xl border border-blue-500/30 flex items-center justify-center text-3xl shadow">
+                        <div className="w-14 h-14 bg-blue-600/10 rounded-xl border border-blue-500/30 flex items-center justify-center text-3xl shadow shrink-0">
                           🌀
                         </div>
-                        <div className="space-y-0.5 max-w-[200px]">
+                        <div className="space-y-0.5 font-sans">
                           <h5 className="font-black text-[#0084ff] text-sm">Gravity Coil (Катушка Гравитации)</h5>
                           <p className="text-[11px] text-[#84868a] leading-tight">Decreases spatial gravity pull - allows 1.8x higher float jumps!</p>
                         </div>
                       </div>
 
-                      <div className="shrink-0 text-right">
+                      <div className="shrink-0 flex sm:flex-col gap-2 justify-end">
                         {hasGravityCoil ? (
                           <span className="p-1 px-3 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold text-[11px] uppercase tracking-wide">Owned ✔️</span>
                         ) : (
-                          <button
-                            onClick={() => buyGamepass('gravity', 80)}
-                            className="px-4 py-2 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow transition"
-                          >
-                            <svg className="w-3.5 h-3.5 text-slate-950 fill-slate-950" viewBox="0 0 32 32">
-                              <path d="M16 2 L29 11 L24 28 L8 28 L3 11 Z" stroke="currentColor" strokeWidth="2.5" />
-                            </svg>
-                            80 R$
-                          </button>
+                          <>
+                            <button
+                              onClick={() => buyGamepass('gravity', 80, 'robux')}
+                              className="px-3 py-2 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1 shadow transition cursor-pointer"
+                            >
+                              <svg className="w-3 h-3 text-slate-950 fill-slate-950" viewBox="0 0 32 32">
+                                <path d="M16 2 L29 11 L24 28 L8 28 L3 11 Z" stroke="currentColor" strokeWidth="2.5" />
+                              </svg>
+                              80 R$
+                            </button>
+                            <button
+                              onClick={() => buyGamepass('gravity', 400, 'coins')}
+                              className="px-3 py-2 rounded bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-black text-xs flex items-center gap-1 shadow transition cursor-pointer"
+                            >
+                              <span>🪙</span>
+                              400 Coins
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>

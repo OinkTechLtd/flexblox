@@ -7,7 +7,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { 
   ArrowLeft, MessageSquare, Send, Award, Clock, RotateCcw, 
-  Volume2, VolumeX, Users, Plus, Star, Shield, HelpCircle 
+  Volume2, VolumeX, Users, Plus, Star, Shield, HelpCircle,
+  ShoppingBag, Coins
 } from 'lucide-react';
 import { LevelData, PartData, PlayerState, NetworkMessage } from '../types';
 import { MultiplayerClient } from '../lib/mpConnection';
@@ -67,6 +68,10 @@ export default function GameClient({
   const [isSpeedCoilOwned, setIsSpeedCoilOwned] = useState<boolean>(false);
   const [isGravityCoilOwned, setIsGravityCoilOwned] = useState<boolean>(false);
 
+  // In-Game Shop states
+  const [isShopOpen, setIsShopOpen] = useState<boolean>(false);
+  const [globalCoins, setGlobalCoins] = useState<number>(0);
+
   // References bypassing react re-renders inside orbiters
   const cameraSensitivityRef = useRef<number>(2.0);
   const isEscOpenRef = useRef<boolean>(false);
@@ -82,10 +87,18 @@ export default function GameClient({
     const gCoil = localStorage.getItem('fb_has_gravity_coil') === 'true';
     setIsSpeedCoilOwned(sCoil);
     setIsGravityCoilOwned(gCoil);
+
+    const storedGlobalCoins = localStorage.getItem('fb_user_coins');
+    if (storedGlobalCoins) {
+      setGlobalCoins(Number(storedGlobalCoins));
+    } else {
+      localStorage.setItem('fb_user_coins', '100');
+      setGlobalCoins(100);
+    }
   }, []);
   const [bots] = useState<{ id: string; nickname: string; color: string }[]>([
     { id: 'bot_1', nickname: 'BuilderPRO_99', color: '#eab308' },
-    { id: 'bot_2', nickname: 'Robloxian_2026', color: '#22c55e' },
+    { id: 'bot_2', nickname: 'Flexian_2026', color: '#22c55e' },
     { id: 'bot_3', nickname: 'FlexGamer', color: '#ec4899' }
   ]);
 
@@ -678,6 +691,8 @@ export default function GameClient({
         geometry = new THREE.SphereGeometry(1.0, 16, 16);
       } else if (part.shape === 'cylinder') {
         geometry = new THREE.CylinderGeometry(1.0, 1.0, 2.0, 16);
+      } else if (part.shape === 'coin') {
+        geometry = new THREE.CylinderGeometry(1.0, 1.0, 0.25, 12);
       } else { // box, spawn, trigger, speedpad
         geometry = new THREE.BoxGeometry(1.0, 1.0, 1.0);
       }
@@ -686,6 +701,11 @@ export default function GameClient({
       mesh.position.set(part.position[0], part.position[1], part.position[2]);
       mesh.rotation.set(part.rotation[0], part.rotation[1], part.rotation[2]);
       mesh.scale.set(part.scale[0], part.scale[1], part.scale[2]);
+      
+      if (part.shape === 'coin') {
+        mesh.rotation.x = Math.PI / 2;
+      }
+
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       
@@ -785,7 +805,7 @@ export default function GameClient({
       swing: number;
     }[] = [];
 
-    const BotNames = ['BuilderPRO_99', 'Robloxian_2026', 'FlexGamer', 'NoobSlayer', 'BloxHero'];
+    const BotNames = ['BuilderPRO_99', 'Flexian_2026', 'FlexGamer', 'NoobSlayer', 'BloxHero'];
     const BotColors = ['#eab308', '#22c55e', '#ec4899', '#06b6d4', '#eab308'];
 
     // If bots is toggle enabled, generate 3 random active characters in game sandbox
@@ -926,8 +946,17 @@ export default function GameClient({
           if (part.shape === 'coin') {
             // Collect Gold and trigger web sockets sync
             if (!collectedCoinIds.has(part.id)) {
+              const reward = part.rewardCoins || 10;
               if (mpClient && mpClient.isSocketOpen()) {
-                mpClient.sendCoinCollected(part.id, part.rewardCoins || 1);
+                mpClient.sendCoinCollected(part.id, reward);
+                // Sync to local coin bank
+                setGlobalCoins(prev => {
+                  const next = prev + reward;
+                  localStorage.setItem('fb_user_coins', String(next));
+                  return next;
+                });
+                setHudMessage(`+${reward} Блок-Монет 🪙`);
+                setTimeout(() => setHudMessage(''), 1500);
               } else {
                 // Offline fallback mode
                 setCollectedCoinIds(prev => {
@@ -935,9 +964,18 @@ export default function GameClient({
                   next.add(part.id);
                   return next;
                 });
-                setTotalCoins(c => c + (part.rewardCoins || 1));
+                setTotalCoins(c => c + reward);
                 mesh.visible = false;
                 playCoinSound();
+
+                // Add to global coins vault
+                setGlobalCoins(prev => {
+                  const next = prev + reward;
+                  localStorage.setItem('fb_user_coins', String(next));
+                  return next;
+                });
+                setHudMessage(`+${reward} Блок-Монет 🪙`);
+                setTimeout(() => setHudMessage(''), 1500);
               }
             }
           } 
@@ -1122,6 +1160,14 @@ export default function GameClient({
         });
       }
 
+      // Spin normal coin objects
+      levelMeshesMapRef.current.forEach((mesh, partId) => {
+        const part = level.parts.find(p => p.id === partId);
+        if (part && part.shape === 'coin') {
+          mesh.rotation.z += 2.5 * dt;
+        }
+      });
+
       // 11.6 Third-Person Chase Camera alignment
       if (cameraRef.current) {
         cameraRef.current.position.x = pos[0] + cameraZoom * Math.sin(cameraYaw) * Math.cos(cameraPitch);
@@ -1298,6 +1344,18 @@ export default function GameClient({
             >
               <Users className="w-4 h-4" />
             </button>
+
+            <div className="h-4 w-[1px] bg-white/15" />
+
+            {/* In-Game Store toggle button */}
+            <button
+              onClick={() => setIsShopOpen(!isShopOpen)}
+              className={`p-1 hover:bg-white/15 rounded-md transition duration-150 relative cursor-pointer ${isShopOpen ? 'text-amber-400 bg-amber-500/15' : 'text-slate-400 hover:text-white'}`}
+              title="Магазин Катушек (SHOP)"
+            >
+              <ShoppingBag className="w-4 h-4" />
+              <span className="absolute -top-1 -right-1 bg-amber-500 rounded-full w-2 h-2 animate-pulse" />
+            </button>
           </div>
 
           {/* Quick Info text badge */}
@@ -1453,7 +1511,7 @@ export default function GameClient({
           </button>
         </div>
 
-        <span className="text-[10px] font-mono tracking-widest text-[#0084ff] font-extrabold uppercase">FlexBlox Sandbox Engine R6 • WASD + Space</span>
+        <span className="text-[10px] font-mono tracking-widest text-[#0084ff] font-extrabold uppercase animate-pulse">FlexBlox Sandbox Engine R6 • WASD + Space</span>
       </div>
 
       {/* 2. COMPLETELY PORTED INTERACTIVE ROBLOX ESCAPE OVERLAY WINDOW */}
@@ -1569,6 +1627,146 @@ export default function GameClient({
             <div className="h-10 bg-[#17181c] border-t border-slate-800 px-6 flex items-center justify-between text-[11px] text-gray-500">
               <span>R6 Lego humanoid rig</span>
               <span>Click Resume or press Escape key to close</span>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* 3. COMPLETELY PORTED INTERACTIVE IN-GAME SHOP MODAL */}
+      {isShopOpen && (
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#1e2024] w-full max-w-lg rounded-xl border border-slate-700/25 flex flex-col overflow-hidden text-slate-200 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            
+            <div className="h-12 bg-[#17181c] border-b border-slate-800 flex justify-between items-center px-6">
+              <span className="font-sans font-black text-xs text-yellow-500 uppercase tracking-wider flex items-center gap-1.5 select-none">
+                <ShoppingBag className="w-4 h-4 text-yellow-400" />
+                Внутриигровой Магазин FlexBlox
+              </span>
+              <button
+                onClick={() => setIsShopOpen(false)}
+                className="text-xs font-bold text-slate-350 hover:text-white transition duration-100 cursor-pointer"
+              >
+                Закрыть (Esc)
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              
+              {/* Header balances metrics */}
+              <div className="bg-[#141518] p-4 rounded-xl border border-slate-700/20 flex justify-between items-center text-xs">
+                <div className="text-left space-y-1">
+                  <span className="text-slate-400 font-bold block">Ваш баланс Блок-Монет:</span>
+                  <span className="font-mono text-xl font-black text-yellow-400 flex items-center gap-1.5">
+                    🪙 {globalCoins}
+                  </span>
+                </div>
+                <div className="text-right space-y-1">
+                  <span className="text-slate-400 font-bold block">Собрано за этот раунд:</span>
+                  <span className="font-mono text-base font-black text-emerald-400">
+                    👑 {totalCoins} монет
+                  </span>
+                </div>
+              </div>
+
+              {/* Items grid info cards */}
+              <div className="space-y-3">
+                
+                {/* Speed Coil Card */}
+                <div className="bg-[#141518]/60 p-3.5 rounded-xl border border-slate-700/20 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 bg-red-600/10 rounded-lg border border-red-500/20 flex items-center justify-center text-2xl shrink-0">
+                      ⚡
+                    </div>
+                    <div className="text-left">
+                      <h4 className="font-black text-red-400 text-xs">Speed Coil (Катушка Скорости)</h4>
+                      <p className="text-[10px] text-slate-400 leading-normal max-w-[210px]">
+                        Постоянно ускоряет бег до 1.65x. Эффект активируется мгновенно!
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    {isSpeedCoilOwned ? (
+                      <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/15 p-1 px-2 border border-emerald-500/30 rounded">КУПЛЕНО ✔️</span>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          if (globalCoins >= 250) {
+                            const nextCoins = globalCoins - 250;
+                            setGlobalCoins(nextCoins);
+                            localStorage.setItem('fb_user_coins', String(nextCoins));
+                            localStorage.setItem('fb_has_speed_coil', 'true');
+                            setIsSpeedCoilOwned(true);
+                            executeRespawn(); // Rebuild avatar
+                            alert("🎉 Поздравляем! Катушка Скорости куплена за 250 🪙 во внутриигровом магазине! Ваше тело пересобрано с активным ускорителем!");
+                          } else {
+                            alert("❌ Недостаточно монет! Требуется 250 🪙. Собирайте золотые монеты на карте!");
+                          }
+                        }}
+                        className="p-1.5 px-3 rounded bg-yellow-500 hover:bg-yellow-450 text-slate-950 font-black text-[11px] cursor-pointer shadow hover:scale-105 active:scale-95 duration-100 transition whitespace-nowrap"
+                      >
+                        250 🪙
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Gravity Coil Card */}
+                <div className="bg-[#141518]/60 p-3.5 rounded-xl border border-slate-700/20 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 bg-blue-600/10 rounded-lg border border-blue-500/20 flex items-center justify-center text-2xl shrink-0">
+                      🌀
+                    </div>
+                    <div className="text-left font-sans">
+                      <h4 className="font-black text-blue-400 text-xs">Gravity Coil (Катушка Гравитации)</h4>
+                      <p className="text-[10px] text-slate-400 leading-normal max-w-[210px]">
+                        Снижает притяжение на -45%. Позволяет прыгать в 1.8x выше!
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    {isGravityCoilOwned ? (
+                      <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/15 p-1 px-2 border border-emerald-500/30 rounded">КУПЛЕНО ✔️</span>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          if (globalCoins >= 400) {
+                            const nextCoins = globalCoins - 400;
+                            setGlobalCoins(nextCoins);
+                            localStorage.setItem('fb_user_coins', String(nextCoins));
+                            localStorage.setItem('fb_has_gravity_coil', 'true');
+                            setIsGravityCoilOwned(true);
+                            executeRespawn(); // Rebuild avatar
+                            alert("🎉 Поздравляем! Катушка Гравитации куплена за 400 🪙 во внутриигровом магазине! Наслаждайтесь высокими прыжками!");
+                          } else {
+                            alert("❌ Недостаточно монет! Требуется 400 🪙. Собирайте золотые монеты на карте!");
+                          }
+                        }}
+                        className="p-1.5 px-3 rounded bg-yellow-500 hover:bg-yellow-450 text-slate-950 font-black text-[11px] cursor-pointer shadow hover:scale-105 active:scale-95 duration-100 transition whitespace-nowrap"
+                      >
+                        400 🪙
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+
+              <div className="bg-slate-800/25 p-3 rounded-lg border border-slate-700/10 text-[10px] text-slate-400 leading-relaxed text-left">
+                💡 <span className="text-slate-200">Совет разработчика:</span> Собирая монеты в плейсе, они мгновенно и без задержки сохраняются в ваших Блок-Монетах. Вся продукция сохраняется навсегда во всех сессиях!
+              </div>
+
+            </div>
+
+            <div className="h-12 bg-[#17181c] border-t border-slate-800 px-6 flex items-center justify-end">
+              <button
+                onClick={() => setIsShopOpen(false)}
+                className="p-1.5 px-4 rounded bg-slate-700 hover:bg-slate-650 text-white font-bold text-xs cursor-pointer shadow active:scale-95 duration-100 transition"
+              >
+                Вернуться к Игре
+              </button>
             </div>
 
           </div>

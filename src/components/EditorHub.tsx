@@ -547,7 +547,7 @@ export default function EditorHub({
         </div>
       </div>
 
-      {/* 2. AUTHENTIC ROBLOX STUDIO TAB RIBBON BAR */}
+      {/* 2. AUTHENTIC FLEXBLOX STUDIO TAB RIBBON BAR */}
       <div className="bg-[#242629] border-b border-[#1b1c1e] shrink-0">
         
         {/* Ribbon Header Tabs */}
