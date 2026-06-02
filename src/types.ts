@@ -29,6 +29,7 @@ export interface LevelData {
   creator: string;
   updatedAt: number;
   parts: PartData[];
+  skyTheme?: 'classic' | 'sunset' | 'cosmic' | 'vaporwave';
 }
 
 export interface PlayerState {

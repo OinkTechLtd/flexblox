@@ -246,7 +246,7 @@ export const TEMPLATES: Record<string, LevelData> = {
   },
   city: {
     id: 'city',
-    name: 'Roblox City Sandbox',
+    name: 'FlexCity Sandbox',
     description: 'Исследуй небольшой уютный город, заберись на вершину стеклянного небоскреба и найди все тайники с монетами!',
     creator: 'FlexBlox Admin',
     updatedAt: 1717362200000,
